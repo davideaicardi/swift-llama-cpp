@@ -100,6 +100,12 @@ final actor Llama {
         try initializeCompletion(text: formattedPrompt)
     }
 
+    /// Initialize completion with pre-formatted text (no chat template applied).
+    /// Use when the caller handles chat template formatting externally.
+    func initializeRawCompletion(text: String) throws {
+        try initializeCompletion(text: text)
+    }
+
     private func initializeCompletion(text: String) throws {
         print("attempting to complete \"\(text)\"")
 

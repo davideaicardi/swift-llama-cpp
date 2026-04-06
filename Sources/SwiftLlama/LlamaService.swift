@@ -139,6 +139,36 @@ public final actor LlamaService {
         }
     }
 
+    /// Stream completion from pre-formatted text (bypasses chat template).
+    /// Use when the caller handles chat template formatting externally.
+    public func streamRawCompletion(text: String, samplingConfig: LlamaSamplingConfig) async throws -> AsyncThrowingStream<String, Error> {
+        guard !text.isEmpty else { throw LlamaError.emptyMessageArray }
+        let llama = try initializeLlamaIfNecessary()
+        await stopCompletion()
+        try await llama.initializeRawCompletion(text: text)
+        await llama.updateSamplingConfig(samplingConfig)
+
+        return AsyncThrowingStream { continuation in
+            currentTask = Task {
+                do {
+                    generationLoop: while await (llama.currentTokenPosition < llama.maxTokenCount) {
+                        guard !Task.isCancelled else { break }
+                        let result = try await llama.generateNextToken()
+                        switch result {
+                        case .token(let token):
+                            continuation.yield(token)
+                        case .endOfString:
+                            break generationLoop
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
     public func stopCompletion() async {
         await currentTask?.cancelAndWait()
     }
